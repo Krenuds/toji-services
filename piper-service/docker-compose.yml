@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  piper-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: piper-tts-service
+    ports:
+      - "9001:9001"
+    volumes:
+      # Persistent storage for voice models (optional - models are cached in image)
+      - piper-models:/app/models/piper
+      # Persistent logs
+      - piper-logs:/app/logs
+      # Temporary files
+      - piper-tmp:/app/tmp
+    environment:
+      # Override default settings if needed
+      - PIPER_PORT=9001
+      - PIPER_HOST=0.0.0.0
+      - LOG_LEVEL=INFO
+      - PIPER_DEFAULT_VOICE=en_US-lessac-medium
+      - PIPER_MAX_TEXT_LENGTH=10000
+      - PIPER_MAX_CONCURRENT=10
+      - PIPER_MODEL_CACHE_SIZE=5
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 45s
+    # Resource limits for production deployment
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    # Network mode for integration with other services
+    networks:
+      - blindr-services
+
+  # Optional: Add a reverse proxy for production
+  # nginx-proxy:
+  #   image: nginx:alpine
+  #   container_name: piper-proxy
+  #   ports:
+  #     - "80:80"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #   depends_on:
+  #     - piper-service
+  #   networks:
+  #     - blindr-services
+
+volumes:
+  piper-models:
+    driver: local
+  piper-logs:
+    driver: local  
+  piper-tmp:
+    driver: local
+
+networks:
+  blindr-services:
+    driver: bridge
+    external: false

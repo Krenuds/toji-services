@@ -1,0 +1,184 @@
+version: '3.8'
+
+services:
+  # Whisper Speech-to-Text Service (GPU accelerated)
+  whisper-service:
+    build:
+      context: ./whisper-service
+      dockerfile: Dockerfile
+    container_name: blindr-whisper
+    restart: unless-stopped
+    ports:
+      - "${WHISPER_PORT:-9000}:9000"
+    environment:
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-small}
+      - WHISPER_PORT=9000
+      - WHISPER_HOST=0.0.0.0
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+    volumes:
+      - whisper_models:/app/models
+      - whisper_logs:/app/logs
+      - /tmp:/tmp  # For temporary audio files
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 8G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - blindr-network
+
+  # Piper Text-to-Speech Service (CPU based)
+  piper-service:
+    build:
+      context: ./piper-service
+      dockerfile: Dockerfile
+    container_name: blindr-piper
+    restart: unless-stopped
+    ports:
+      - "${PIPER_PORT:-9001}:9001"
+    environment:
+      - PIPER_PORT=9001
+      - PIPER_HOST=0.0.0.0
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DEFAULT_VOICE=${PIPER_DEFAULT_VOICE:-en_US-amy-medium}
+      - MAX_TEXT_LENGTH=${PIPER_MAX_TEXT_LENGTH:-10000}
+    volumes:
+      - piper_models:/app/models
+      - piper_logs:/app/logs
+      - piper_cache:/app/cache
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - blindr-network
+    depends_on:
+      - whisper-service
+
+  # Optional: Reverse Proxy (Nginx) for production
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: blindr-proxy
+    restart: unless-stopped
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - blindr-network
+    depends_on:
+      - whisper-service
+      - piper-service
+    profiles:
+      - production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Monitoring with Prometheus (for production)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: blindr-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - blindr-network
+    profiles:
+      - monitoring
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  # Whisper service volumes
+  whisper_models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${WHISPER_MODELS_PATH:-./data/whisper/models}
+  whisper_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${WHISPER_LOGS_PATH:-./data/whisper/logs}
+  
+  # Piper service volumes
+  piper_models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PIPER_MODELS_PATH:-./data/piper/models}
+  piper_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PIPER_LOGS_PATH:-./data/piper/logs}
+  piper_cache:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PIPER_CACHE_PATH:-./data/piper/cache}
+  
+  # Infrastructure volumes
+  nginx_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+
+networks:
+  blindr-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

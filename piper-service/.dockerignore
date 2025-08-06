@@ -1,0 +1,93 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Documentation
+*.md
+docs/
+README*
+
+# Logs (will be created by the container)
+logs/
+*.log
+
+# Temporary files
+tmp/
+*.tmp
+.cache/
+
+# Models (cached during build, don't copy from host)
+models/
+*.onnx
+*.onnx.json
+
+# Build artifacts
+*.tar.gz
+*.zip
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+
+# Testing and development scripts
+test_*.py
+*_test.py
+tests/
