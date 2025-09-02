@@ -1,6 +1,8 @@
-# Blindr Services - Speech Processing Infrastructure
+# Toji Services - Speech Processing Infrastructure
 
-This repository contains dockerized speech processing services extracted from the [blindr voice assistant](https://github.com/yourusername/blindr) project. These services provide Speech-to-Text (STT) and Text-to-Speech (TTS) capabilities via HTTP APIs.
+⚠️ **IMPORTANT**: See [DEPLOYMENT.md](DEPLOYMENT.md) for critical setup instructions, especially regarding Docker installation and GPU support.
+
+This repository contains dockerized speech processing services for the Toji (formerly Blindr) voice assistant. These services provide Speech-to-Text (STT) and Text-to-Speech (TTS) capabilities via HTTP APIs.
 
 ## Services
 
@@ -44,10 +46,10 @@ docker-compose down
 ### Individual Service Management
 ```bash
 # Whisper only
-docker run -d -p 9000:9000 --gpus all blindr/whisper-service
+docker run -d -p 9000:9000 --gpus all toji/whisper-service
 
 # Piper only
-docker run -d -p 9001:9001 --gpus all blindr/piper-service
+docker run -d -p 9001:9001 toji/piper-service
 ```
 
 ## API Documentation
@@ -150,12 +152,12 @@ docker-compose logs -f whisper
 docker-compose logs -f piper
 ```
 
-## Integration with Blindr Bot
+## Integration with Toji Bot
 
-These services are designed to work with the blindr Discord bot:
+These services are designed to work with the Toji Discord bot:
 
 ```python
-# In your blindr bot configuration
+# In your bot configuration
 WHISPER_URL = "http://localhost:9000"
 PIPER_URL = "http://localhost:9001"
 ```
@@ -203,9 +205,9 @@ docker-compose run whisper pytest
 
 ## License
 
-This project is part of the blindr ecosystem and follows the same licensing terms.
+This project is part of the Toji ecosystem and follows the same licensing terms.
 
 ## Support
 
 For issues specific to these services, please open an issue in this repository.
-For blindr bot integration issues, refer to the main [blindr repository](https://github.com/yourusername/blindr).
+For Toji bot integration issues, refer to the main Toji repository.
