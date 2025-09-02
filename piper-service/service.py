@@ -153,7 +153,13 @@ def synthesize_audio_sync(text: str, voice_model: piper.PiperVoice) -> bytes:
     
     try:
         with wave.open(wav_buffer, 'wb') as wav_file:
-            voice_model.synthesize_wav(text, wav_file)
+            # Configure WAV format parameters
+            wav_file.setnchannels(1)  # Mono audio
+            wav_file.setsampwidth(2)  # 16-bit samples
+            wav_file.setframerate(voice_model.config.sample_rate)  # Use model's sample rate
+            
+            # Generate audio using the correct Piper API
+            voice_model.synthesize(text, wav_file)
         
         return wav_buffer.getvalue()
         

@@ -2,6 +2,8 @@
 
 ⚠️ **IMPORTANT**: See [DEPLOYMENT.md](DEPLOYMENT.md) for critical setup instructions, especially regarding Docker installation and GPU support.
 
+📋 **PRODUCTION READY**: All known audio processing issues have been resolved. See [PRODUCTION_ISSUES.md](PRODUCTION_ISSUES.md) for troubleshooting guidance.
+
 This repository contains dockerized speech processing services for the Toji (formerly Blindr) voice assistant. These services provide Speech-to-Text (STT) and Text-to-Speech (TTS) capabilities via HTTP APIs.
 
 ## Services
