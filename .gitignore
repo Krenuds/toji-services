@@ -41,6 +41,41 @@ logs/
 # Docker
 *.pid
 docker-compose.override.yml
+docker-compose.local.yml
+
+# Data directories (preserve existing data)
+/data/
+whisper_models/
+whisper_logs/
+piper_models/
+piper_logs/
+piper_cache/
+
+# Monitoring data
+prometheus_data/
+nginx_logs/
+
+# Backup files
+*.bak
+*.backup
+backup/
+backups/
+*.tar.gz
+*.zip
+
+# SSL certificates (keep examples)
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+!nginx/ssl/*.example
+
+# Claude artifacts
+CLAUDE.md
+
+# Secrets
+secrets/
+*.secret
+credentials.json
 
 # IDE
 .vscode/

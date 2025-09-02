@@ -33,15 +33,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 # Pre-download and cache a default voice model to avoid startup delays
 # This reduces first-request latency in production
 RUN mkdir -p /opt/models/piper && \
-    python -c "
-import urllib.request
-import os
-model_url = 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx'
-config_url = 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json'
-urllib.request.urlretrieve(model_url, '/opt/models/piper/en_US-lessac-medium.onnx')
-urllib.request.urlretrieve(config_url, '/opt/models/piper/en_US-lessac-medium.onnx.json')
-print('Default voice model cached successfully')
-"
+    python -c "import urllib.request; import os; model_url = 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx'; config_url = 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json'; urllib.request.urlretrieve(model_url, '/opt/models/piper/en_US-lessac-medium.onnx'); urllib.request.urlretrieve(config_url, '/opt/models/piper/en_US-lessac-medium.onnx.json'); print('Default voice model cached successfully')"
 
 # Stage 2: Runtime environment
 FROM python:3.11-slim-bullseye

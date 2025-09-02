@@ -1,9 +1,21 @@
-# Blindr Services Deployment Guide
+# Toji Services Deployment Guide
 
-This guide provides comprehensive instructions for deploying the Blindr voice assistant services using Docker Compose.
+## CRITICAL LESSONS LEARNED - READ FIRST
+
+### Docker Installation Warning
+**DO NOT USE SNAP-INSTALLED DOCKER** - It does not support GPU passthrough to containers. This was a major issue that caused GPU detection failures. Always use Docker CE from the official repository.
+
+### Key Issues We Encountered and Solutions
+1. **Snap Docker blocks GPU access** - Remove snap Docker, install Docker CE
+2. **NVIDIA runtime not configured** - Must edit /etc/docker/daemon.json
+3. **Network conflicts** - Remove old Docker networks before deployment
+4. **Container name conflicts** - Remove old containers before redeployment
+
+This guide provides comprehensive instructions for deploying the Toji (formerly Blindr) speech processing services with proper GPU support.
 
 ## Table of Contents
-- [Quick Start](#quick-start)
+- [Critical Setup Steps](#critical-setup-steps)
+- [Quick Start](#quick-start)  
 - [Prerequisites](#prerequisites)
 - [Environment Setup](#environment-setup)
 - [Service Configuration](#service-configuration)
@@ -12,23 +24,104 @@ This guide provides comprehensive instructions for deploying the Blindr voice as
 - [Troubleshooting](#troubleshooting)
 - [Production Considerations](#production-considerations)
 
-## Quick Start
+## Critical Setup Steps
 
-For a rapid deployment with default settings:
+### 1. Remove Snap Docker and Install Docker CE
 
 ```bash
-# 1. Clone and setup
+# Check if Docker is from snap (BAD)
+which docker
+# If output is /snap/bin/docker, remove it:
+sudo snap remove docker
+
+# Install Docker CE properly
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg lsb-release
+
+# Add Docker's official GPG key
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Set up repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker Engine
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+### 2. Configure NVIDIA Runtime (CRITICAL FOR GPU)
+
+```bash
+# Install NVIDIA Container Toolkit
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+
+# Configure Docker daemon for NVIDIA runtime
+sudo tee /etc/docker/daemon.json <<EOF
+{
+    "default-runtime": "nvidia",
+    "runtimes": {
+        "nvidia": {
+            "args": [],
+            "path": "nvidia-container-runtime"
+        }
+    }
+}
+EOF
+
+# Restart Docker
+sudo systemctl restart docker
+
+# VERIFY GPU ACCESS (This must work!)
+docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+```
+
+## Quick Start
+
+After completing critical setup:
+
+```bash
+# 1. Clone repository
 cd /home/travis/services
-make setup
+git clone https://github.com/Krenuds/toji-services.git
+cd toji-services
 
-# 2. Review and customize environment
-nano .env
+# 2. Create environment file
+cp .env.example .env
+nano .env  # Edit as needed
 
-# 3. Start core services
-make up
+# 3. Use existing data (if available)
+cat > docker-compose.override.yml <<EOF
+version: '3.8'
+services:
+  whisper-service:
+    volumes:
+      - /home/travis/services/data/whisper/models:/app/models
+      - /home/travis/services/data/whisper/logs:/app/logs
+      - /tmp:/tmp
+  piper-service:
+    volumes:
+      - /home/travis/services/data/piper/models:/app/models
+      - /home/travis/services/data/piper/logs:/app/logs
+      - /home/travis/services/data/piper/cache:/app/cache
+EOF
 
-# 4. Verify deployment
-make health
+# 4. Build and start services
+docker-compose build
+docker-compose up -d
+
+# 5. Verify GPU is being used
+curl -s http://localhost:9000/health | python3 -m json.tool
+# Should show "device": "cuda"
 ```
 
 ## Prerequisites
@@ -41,26 +134,8 @@ make health
 - **Network**: Ports 9000, 9001 available (and 80, 443 for production)
 
 ### Software Dependencies
-```bash
-# Install Docker and Docker Compose
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
 
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Install NVIDIA Container Runtime (for GPU support)
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-sudo apt-get update && sudo apt-get install -y nvidia-docker2
-sudo systemctl restart docker
-
-# Verify GPU access
-docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu20.04 nvidia-smi
-```
+**CRITICAL**: See [Critical Setup Steps](#critical-setup-steps) above for proper Docker and NVIDIA runtime installation. Do NOT use snap Docker or skip the daemon.json configuration.
 
 ## Environment Setup
 
@@ -277,7 +352,30 @@ make clean
 
 ### Common Issues
 
-#### GPU Not Detected
+#### GPU Not Detected (Most Common Issue)
+
+**Primary Cause**: Snap-installed Docker or missing NVIDIA runtime configuration.
+
+**Solution Checklist**:
+1. Verify Docker is NOT from snap:
+   ```bash
+   which docker  # Should NOT be /snap/bin/docker
+   ```
+   
+2. Check NVIDIA runtime is configured:
+   ```bash
+   cat /etc/docker/daemon.json
+   # Must contain "default-runtime": "nvidia"
+   ```
+   
+3. Test GPU access directly:
+   ```bash
+   docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+   ```
+   
+4. If still failing, completely reinstall Docker following [Critical Setup Steps](#critical-setup-steps)
+
+#### GPU Not Detected (Legacy)
 ```bash
 # Check GPU availability
 nvidia-smi
@@ -374,21 +472,21 @@ make debug
 3. **Model Persistence**: Models are cached in volumes
 4. **Recovery Testing**: Test restore procedures regularly
 
-## Integration with Blindr Bot
+## Integration with Toji/Blindr Bot
 
-The services are designed to be drop-in replacements for the embedded components in the Blindr bot. To integrate:
+The services are designed to be drop-in replacements for the embedded components in the Toji (formerly Blindr) bot. To integrate:
 
-1. **Update Blindr Configuration**:
+1. **Update Bot Configuration**:
    ```python
-   # In blindr bot config
+   # In bot config
    WHISPER_API_URL = "http://localhost:9000"
    PIPER_API_URL = "http://localhost:9001"
    ```
 
 2. **Test Integration**:
    ```bash
-   cd /home/travis/blindr
-   ./blindr start  # Should connect to dockerized services
+   cd /home/travis/toji  # or /home/travis/blindr
+   ./toji start  # Should connect to dockerized services
    ```
 
 3. **Monitor Performance**: Compare performance with embedded versions

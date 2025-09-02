@@ -9,7 +9,7 @@ pydantic==2.5.0
 piper-tts==1.2.0
 
 # Audio processing
-wave
+# wave is included in Python standard library
 
 # HTTP client for model downloads
 urllib3==2.1.0

@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Whisper Speech-to-Text Service (CPU mode)
+  whisper-service:
+    build:
+      context: ./whisper-service
+      dockerfile: Dockerfile
+    container_name: blindr-whisper
+    restart: unless-stopped
+    ports:
+      - "${WHISPER_PORT:-9000}:9000"
+    environment:
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-small}
+      - WHISPER_PORT=9000
+      - WHISPER_HOST=0.0.0.0
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DEVICE=cpu  # Force CPU mode
+    volumes:
+      - /home/travis/services/data/whisper/models:/app/models
+      - /home/travis/services/data/whisper/logs:/app/logs
+      - /tmp:/tmp  # For temporary audio files
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - blindr-network
+
+  # Piper Text-to-Speech Service (CPU based)
+  piper-service:
+    build:
+      context: ./piper-service
+      dockerfile: Dockerfile
+    container_name: blindr-piper
+    restart: unless-stopped
+    ports:
+      - "${PIPER_PORT:-9001}:9001"
+    environment:
+      - PIPER_PORT=9001
+      - PIPER_HOST=0.0.0.0
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DEFAULT_VOICE=${PIPER_DEFAULT_VOICE:-en_US-lessac-medium}
+      - MAX_TEXT_LENGTH=${PIPER_MAX_TEXT_LENGTH:-10000}
+    volumes:
+      - /home/travis/services/data/piper/models:/app/models
+      - /home/travis/services/data/piper/logs:/app/logs
+      - /home/travis/services/data/piper/cache:/app/cache
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - blindr-network
+    depends_on:
+      - whisper-service
+
+networks:
+  blindr-network:
+    driver: bridge
