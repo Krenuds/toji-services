@@ -87,6 +87,9 @@ ENV CUDA_VISIBLE_DEVICES=0
 ENV TORCH_CUDNN_V8_API_DISABLED=1
 ENV TOKENIZERS_PARALLELISM=false
 
+# Add cuDNN libraries to library path for GPU acceleration
+ENV LD_LIBRARY_PATH="/opt/venv/lib/python3.11/site-packages/nvidia/cudnn/lib:/opt/venv/lib/python3.11/site-packages/ctranslate2.libs:${LD_LIBRARY_PATH}"
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:9000/health || exit 1
