@@ -20,7 +20,7 @@ class ServiceConfig:
         
         # Model configuration  
         self.models_dir = Path(os.getenv("PIPER_MODELS_DIR", "models/piper"))
-        self.default_voice = os.getenv("PIPER_DEFAULT_VOICE", "en_US-lessac-medium")
+        self.default_voice = os.getenv("PIPER_DEFAULT_VOICE", "en_US-lessac-low")
         self.max_text_length = int(os.getenv("PIPER_MAX_TEXT_LENGTH", "10000"))
         
         # Performance settings
