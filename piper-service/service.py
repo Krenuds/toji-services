@@ -10,7 +10,8 @@ import io
 import os
 import logging
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+import subprocess
+from typing import Optional, Dict, List, Any, Literal
 import urllib.request
 import wave
 import json
@@ -30,6 +31,7 @@ class TTSRequest(BaseModel):
     text: str = Field(..., description="Text to convert to speech", min_length=1, max_length=10000)
     voice: Optional[str] = Field(None, description="Voice model to use (defaults to service default)")
     speed: Optional[float] = Field(1.0, description="Speech speed multiplier", ge=0.5, le=2.0)
+    format: Literal["wav", "opus"] = "wav"
 
 
 class VoiceInfo(BaseModel):
@@ -147,6 +149,26 @@ async def load_voice_model(voice_name: str) -> piper.PiperVoice:
         raise HTTPException(status_code=500, detail=f"Failed to load voice model: {str(e)}")
 
 
+def wav_to_opus(wav_bytes: bytes) -> bytes:
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-loglevel", "error",
+                "-i", "pipe:0",
+                "-ar", "48000", "-ac", "2",
+                "-c:a", "libopus", "-b:a", "64k", "-application", "voip",
+                "-f", "ogg", "pipe:1",
+            ],
+            input=wav_bytes,
+            capture_output=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error("ffmpeg opus encode failed: %s", e.stderr.decode(errors="replace"))
+        raise
+    return proc.stdout
+
+
 def synthesize_audio_sync(text: str, voice_model: piper.PiperVoice) -> bytes:
     """Synchronous audio synthesis - runs in executor."""
     wav_buffer = io.BytesIO()
@@ -193,7 +215,18 @@ async def text_to_speech(request: TTSRequest) -> Response:
         )
         
         logger.info(f"TTS completed: {len(audio_data)} bytes generated")
-        
+
+        if request.format == "opus":
+            audio_data = await loop.run_in_executor(None, wav_to_opus, audio_data)
+            return Response(
+                content=audio_data,
+                media_type="audio/ogg",
+                headers={
+                    "Content-Disposition": "inline; filename=\"speech.ogg\"",
+                    "Content-Length": str(len(audio_data)),
+                },
+            )
+
         return Response(
             content=audio_data,
             media_type="audio/wav",

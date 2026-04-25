@@ -48,6 +48,7 @@ RUN apt-get update && apt-get install -y \
     alsa-utils \
     espeak-ng \
     espeak-ng-data \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
