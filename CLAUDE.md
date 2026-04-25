@@ -1,106 +1,93 @@
-# Blindr Services - Dockerized Components
+# Toji Services — Workspace Guide
 
-## Project Overview
-This directory contains the extracted and dockerized services from the **blindr** voice assistant project. These services were originally embedded within the main blindr codebase at `/home/travis/blindr/` and are being separated to improve architecture, scalability, and maintainability.
+This repo is the source for the dockerized speech services that power the
+**Toji v2** Discord voice bot. The bot itself lives at `/home/travis/toji2/`
+(TypeScript on Bun). Only `piper-service` (TTS) is actively maintained from
+this workspace right now; `whisper-service` is included for completeness but
+the running STT container has not been touched in months.
 
-## Parent Project: blindr
-- **Location**: `/home/travis/blindr/`
-- **Purpose**: Discord voice assistant for visually impaired users
-- **Status**: Working prototype with embedded services
-- **Why Extraction**: The main bot became too monolithic; services need independent scaling
+The active machine is `oracle` (the box you're on). Every service in this
+repo runs as a Docker container against bind-mounted data in
+`/home/travis/services/` (a separate, data-only directory — do not confuse
+the two).
 
-## Services Being Extracted
+---
 
-### 1. Whisper Service (Speech-to-Text)
-- **Original Location**: `/home/travis/blindr/src/whisper/service.py`
-- **Purpose**: GPU-accelerated speech recognition using faster-whisper
-- **Port**: 9000
-- **Status**: Already a FastAPI service, needs minor adjustments for standalone operation
+## Where things live
 
-### 2. Piper Service (Text-to-Speech)
-- **Original Location**: `/home/travis/blindr/src/piper/client.py` (embedded library)
-- **Purpose**: Natural voice synthesis using Piper TTS
-- **Port**: 9001 (new)
-- **Status**: Currently embedded library, needs conversion to HTTP service
+| Path | What it is |
+|---|---|
+| `/home/travis/toji-services-src/` | This repo — the source of truth |
+| `/home/travis/services/` | Runtime data: models, logs (do **not** edit code here) |
+| `/home/travis/toji2/` | The Discord bot that consumes these services |
+| `Krenuds/toji-services` (GitHub) | Remote for this repo |
 
-## Architecture Relationship
-```
-[Discord Users] <-> [blindr Bot @ /home/travis/blindr/]
-                            |
-                            v
-                    [HTTP API Calls]
-                    /               \
-                   v                 v
-        [Whisper Service]    [Piper Service]
-         (Port 9000)          (Port 9001)
-```
+Bind mount in production: `/home/travis/services/data/piper/models` →
+`/app/models/piper` inside the container.
 
-## Migration Goals
-1. **Zero Downtime**: Services should be swappable without breaking the bot
-2. **Backward Compatible**: Initial versions maintain same API contracts
-3. **GPU Optimization**: Both services share GPU resources efficiently
-4. **System Services**: Run as Docker containers managed by systemd
+---
 
-## Directory Structure
-```
-/home/travis/services/
-├── CLAUDE.md (this file)
-├── README.md (user documentation)
-├── docker-compose.yml (orchestration)
-├── whisper-service/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── service.py
-│   └── config/
-└── piper-service/
-    ├── Dockerfile
-    ├── requirements.txt
-    ├── service.py
-    ├── models/ (cached models)
-    └── config/
-```
+## Deploy loop
 
-## Development Workflow
-1. Extract service code from blindr project
-2. Remove blindr-specific dependencies
-3. Create standalone Docker containers
-4. Test with blindr bot
-5. Deploy as system services
-
-## Important Notes
-- Services must remain compatible with blindr bot's current expectations
-- GPU memory is shared - implement proper cleanup on shutdown
-- Model files are large - use Docker volumes for persistence
-- Both services should auto-restart on failure
-
-## Environment Variables
-Services inherit configuration from blindr where applicable:
-- `WHISPER_PORT`: 9000 (default)
-- `PIPER_PORT`: 9001 (new)
-- `CUDA_VISIBLE_DEVICES`: GPU selection
-- `LOG_LEVEL`: info/debug/error
-
-## Testing Integration
-After dockerizing, test with blindr bot:
 ```bash
-# From blindr directory
-cd /home/travis/blindr
-./blindr start  # Should connect to dockerized services
+cd /home/travis/toji-services-src/piper-service
+docker-compose build           # builds piper-service-piper-service:latest
+docker-compose up -d           # recreates the running container in place
+docker logs -f piper-service   # tail to confirm healthy startup
 ```
 
-## Status Tracking
-- [ ] Whisper service extracted
-- [ ] Whisper Dockerfile created
-- [ ] Piper service created (convert from library)
-- [ ] Piper Dockerfile created
-- [ ] Docker Compose configuration
-- [ ] Integration tested with blindr
-- [ ] Systemd service files created
-- [ ] Documentation updated in both projects
+`docker-compose.yml` in this directory is the **only** orchestration file
+that matches reality. It declares the running container's name, port,
+bind mount, env vars, and healthcheck. Do not edit these without
+verifying against `docker inspect piper-service` first — the file was
+reconciled with the live container on 2026-04-25 after a long period of
+hand-launched drift.
 
-## Cross-Project Communication
-- Changes here may require updates in `/home/travis/blindr/`
-- Service APIs must maintain backward compatibility
-- Breaking changes require coordinated updates
+To roll back to a previous image:
+```bash
+docker stop piper-service && docker rm piper-service
+docker run -d --name piper-service -p 9001:9001 \
+  -v /home/travis/services/data/piper/models:/app/models/piper \
+  -e PIPER_DEFAULT_VOICE=en_US-lessac-medium \
+  --restart unless-stopped <image-sha>
+```
 
-This separation allows the blindr bot to focus on Discord interaction and conversation management while these services handle the heavy lifting of speech processing.
+---
+
+## Current state
+
+- Image: `piper-service-piper-service:latest`
+- Default voice: `en_US-lessac-medium` (22050 Hz mono)
+- Endpoint: `POST /tts` returns `audio/wav`
+- Health: `GET /health`
+- The service has **no Opus support today**. Adding it is the active work
+  — see `docs/opus-output-roadmap.md`.
+
+---
+
+## Coupling to toji2
+
+The bot calls `POST http://localhost:9001/tts` for every spoken reply.
+Today it parses the returned WAV header, extracts PCM, resamples
+22k mono → 48k stereo, and feeds the result to discord.js. That whole
+client-side pipeline goes away once this service can emit Ogg-Opus
+directly. The toji2 side of the migration is tracked in
+`/home/travis/toji2/docs/audio-opus-unification.md`.
+
+When you change the API contract here, the bot's `TtsClient.ts` and
+`PlaybackBus.ts` change in lockstep. Coordinate the two repos — break
+the bot once and you'll be debugging two things at once.
+
+---
+
+## What this repo is *not*
+
+- Not the place to run the bot. `toji2` does that.
+- Not the place to debug Discord voice playback. The bot's
+  `src/voice/CLAUDE.md` covers that path.
+- Not the place to store models or logs. Those live under
+  `/home/travis/services/`, mounted in.
+
+Historical docs (`docs/MIGRATION_PLAN.md`, `docs/ARCHITECTURE.md`) describe
+the original 2025 extraction from the monolith. They're kept for context
+but do not reflect current operational reality — this file does.
