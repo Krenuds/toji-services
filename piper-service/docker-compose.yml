@@ -8,6 +8,7 @@ services:
       - "9001:9001"
     volumes:
       - /home/travis/services/data/piper/models:/app/models/piper
+      - ../logs:/app/logs
     environment:
       - PIPER_PORT=9001
       - PIPER_HOST=0.0.0.0
@@ -24,3 +25,8 @@ services:
       timeout: 15s
       retries: 3
       start_period: 45s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"

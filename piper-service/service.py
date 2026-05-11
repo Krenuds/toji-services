@@ -77,6 +77,14 @@ app = FastAPI(
 logger = setup_logging(config)
 
 
+class _HealthFilter(logging.Filter):
+    def filter(self, record):
+        return "/health" not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_HealthFilter())
+
+
 # Use extended voice catalog from config
 VOICE_CATALOG = EXTENDED_VOICE_CATALOG
 

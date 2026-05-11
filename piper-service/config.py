@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any
 import logging
+from logging.handlers import RotatingFileHandler
 
 
 class ServiceConfig:
@@ -176,8 +177,10 @@ def setup_logging(config: ServiceConfig) -> logging.Logger:
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     
-    # File handler
-    file_handler = logging.FileHandler(config.log_file)
+    # Rotating file handler (10 MB x 5 = ~50 MB cap)
+    file_handler = RotatingFileHandler(
+        config.log_file, maxBytes=10_000_000, backupCount=5
+    )
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     
