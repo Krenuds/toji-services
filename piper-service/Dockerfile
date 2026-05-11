@@ -48,7 +48,6 @@ RUN apt-get update && apt-get install -y \
     alsa-utils \
     espeak-ng \
     espeak-ng-data \
-    ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -74,7 +73,6 @@ WORKDIR /app
 # Copy application code with proper ownership
 COPY --chown=piper:piper service.py /app/
 COPY --chown=piper:piper config.py /app/
-COPY --chown=piper:piper start.py /app/
 
 # Copy cached models to app directory
 COPY --from=builder --chown=piper:piper /opt/models/piper /app/models/piper/
@@ -95,8 +93,6 @@ ENV PIPER_DEFAULT_VOICE=en_US-lessac-medium
 ENV LOG_LEVEL=INFO
 ENV PIPER_LOG_FILE=/app/logs/piper-service.log
 ENV PIPER_MAX_TEXT_LENGTH=10000
-ENV PIPER_MAX_CONCURRENT=10
-ENV PIPER_MODEL_CACHE_SIZE=5
 
 # Disable parallelism for tokenizers to avoid memory issues
 ENV TOKENIZERS_PARALLELISM=false

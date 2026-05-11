@@ -23,11 +23,7 @@ class ServiceConfig:
         self.models_dir = Path(os.getenv("PIPER_MODELS_DIR", "models/piper"))
         self.default_voice = os.getenv("PIPER_DEFAULT_VOICE", "en_US-lessac-low")
         self.max_text_length = int(os.getenv("PIPER_MAX_TEXT_LENGTH", "10000"))
-        
-        # Performance settings
-        self.max_concurrent_requests = int(os.getenv("PIPER_MAX_CONCURRENT", "10"))
-        self.model_cache_size = int(os.getenv("PIPER_MODEL_CACHE_SIZE", "5"))
-        
+
         # Logging
         self.log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         self.log_file = os.getenv("PIPER_LOG_FILE", "logs/piper-service.log")
@@ -46,13 +42,7 @@ class ServiceConfig:
         
         if self.max_text_length < 1:
             raise ValueError(f"Invalid max text length: {self.max_text_length}")
-        
-        if self.max_concurrent_requests < 1:
-            raise ValueError(f"Invalid max concurrent requests: {self.max_concurrent_requests}")
-        
-        if self.model_cache_size < 1:
-            raise ValueError(f"Invalid model cache size: {self.model_cache_size}")
-        
+
         valid_log_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if self.log_level not in valid_log_levels:
             raise ValueError(f"Invalid log level: {self.log_level}. Must be one of {valid_log_levels}")
@@ -65,8 +55,6 @@ class ServiceConfig:
             'models_dir': str(self.models_dir),
             'default_voice': self.default_voice,
             'max_text_length': self.max_text_length,
-            'max_concurrent_requests': self.max_concurrent_requests,
-            'model_cache_size': self.model_cache_size,
             'log_level': self.log_level,
             'log_file': self.log_file
         }

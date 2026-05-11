@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional, Dict, List, Any, Literal
 import urllib.request
 import wave
-import json
+from contextlib import asynccontextmanager
 
 import av
 
@@ -67,14 +67,45 @@ class DownloadVoiceRequest(BaseModel):
 # Global state
 config = ServiceConfig()
 voice_models: Dict[str, piper.PiperVoice] = {}
-app = FastAPI(
-    title="Piper TTS Service",
-    description="HTTP API for Piper text-to-speech synthesis",
-    version="1.0.0"
-)
 
 # Setup logging
 logger = setup_logging(config)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Service lifespan: startup and shutdown logic."""
+    # Startup
+    logger.info("Starting Piper TTS Service...")
+    logger.info(f"Models directory: {config.models_dir}")
+    logger.info(f"Default voice: {config.default_voice}")
+
+    # Pre-load default voice model
+    try:
+        await load_voice_model(config.default_voice)
+        logger.info("Default voice model loaded successfully")
+    except Exception as e:
+        logger.warning(f"Failed to pre-load default voice: {e}")
+
+    logger.info("Piper TTS Service started successfully")
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down Piper TTS Service...")
+
+    # Clear loaded models to free memory
+    voice_models.clear()
+
+    logger.info("Piper TTS Service shut down")
+
+
+app = FastAPI(
+    title="Piper TTS Service",
+    description="HTTP API for Piper text-to-speech synthesis",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 
 class _HealthFilter(logging.Filter):
@@ -141,7 +172,7 @@ async def load_voice_model(voice_name: str) -> piper.PiperVoice:
         model_path, config_path = await download_voice_model(voice_name)
         
         # Load model in executor to avoid blocking
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         voice_model = await loop.run_in_executor(
             None,
             piper.PiperVoice.load,
@@ -218,7 +249,7 @@ async def text_to_speech(request: TTSRequest) -> Response:
         voice_model = await load_voice_model(voice_name)
         
         # Generate audio in executor
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         audio_data = await loop.run_in_executor(
             None,
             synthesize_audio_sync,
@@ -331,34 +362,6 @@ async def download_voice(request: DownloadVoiceRequest, background_tasks: Backgr
         "message": f"Voice model '{voice_name}' download started",
         "voice_name": voice_name
     }
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the service on startup."""
-    logger.info("Starting Piper TTS Service...")
-    logger.info(f"Models directory: {config.models_dir}")
-    logger.info(f"Default voice: {config.default_voice}")
-    
-    # Pre-load default voice model
-    try:
-        await load_voice_model(config.default_voice)
-        logger.info("Default voice model loaded successfully")
-    except Exception as e:
-        logger.warning(f"Failed to pre-load default voice: {e}")
-    
-    logger.info("Piper TTS Service started successfully")
-
-
-@app.on_event("shutdown") 
-async def shutdown_event():
-    """Cleanup on service shutdown."""
-    logger.info("Shutting down Piper TTS Service...")
-    
-    # Clear loaded models to free memory
-    voice_models.clear()
-    
-    logger.info("Piper TTS Service shut down")
 
 
 if __name__ == "__main__":
