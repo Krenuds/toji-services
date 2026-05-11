@@ -5,6 +5,7 @@ Simplified version for standalone operation
 
 import logging
 import os
+from logging.handlers import RotatingFileHandler
 from typing import Optional
 
 
@@ -34,5 +35,14 @@ def get_logger(name: str = "whisper-service") -> logging.Logger:
     
     # Add handler to logger
     logger.addHandler(console_handler)
-    
+
+    # Rotating file handler (10 MB x 5 = ~50 MB cap)
+    log_file = os.getenv("WHISPER_LOG_FILE", "/app/logs/whisper-service.log")
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=10_000_000, backupCount=5
+    )
+    file_handler.setLevel(logger.level)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
     return logger

@@ -107,6 +107,33 @@ docker logs --tail 20 whisper-service # no /health lines
 
 Done when both `logs/piper-service.log` and `logs/whisper-service.log` are growing on the host from a single `tail -f ../logs/*.log`, and neither `docker logs` is full of `/health` noise.
 
+### Step 2 — Outcome (2026-05-10) ✅
+
+All objectives met. End-to-end TTS→STT round-trip verified: piper synthesizes "the quick brown fox", whisper transcribes it back as `"The quick brown fox jumps over the lazy dog."`. GPU still live (RTX 2080, CUDA enabled). Both `logs/*.log` files growing live, `/health` filtered out of `docker logs`.
+
+Whisper now compose-managed (was hand-launched before). Compose drift cleaned up — `read_only: true`, the `whisper_models` and `whisper_logs` named volumes, and unverified `mem_limit`/`cap_drop` fields all dropped to match the live container. GPU `deploy.resources` block preserved (verified live). Tmpfs `/app/tmp` preserved.
+
+**Four surprises hit and fixed during rollout** — document so the next rebuild doesn't relearn them:
+
+1. **`docker cp` bypasses bind mounts.** Whisper's model cache (464 MB) lived in a "ghost" bind mount — source dir on host had been deleted long ago, but the running container still saw the data via held inode. `docker cp container:/path` reads the underlying *image layer*, not the bind-mounted view, so it returned an empty directory. Workaround: stream via the container's view with tar:
+   ```bash
+   sudo docker exec --user 0 whisper-service tar -cf - -C /root/.cache/huggingface . \
+     | sudo tar -xf - -C /home/travis/services/data/whisper/models/
+   sudo chown -R 1001:1001 /home/travis/services/data/whisper/models
+   ```
+
+2. **Hand-launched container can't be recreated by compose.** The pre-existing whisper container was started ad hoc, so `docker-compose up -d` raised a name conflict. One-time fix: `docker stop whisper-service && docker rm whisper-service && docker-compose up -d`. From here on, compose owns the lifecycle.
+
+3. **CUDA 13 dependency drift on fresh rebuild.** `requirements.txt` previously used only floor constraints (`torch>=2.1.0`). A fresh `pip install` in 2026-05 resolved `torch==2.11.0`, which switched to `nvidia-*-cu13` deps. `ctranslate2` (the faster-whisper backend) is built against CUDA 12 and crashed at runtime with `libcublas.so.12 not found`. Fix: pin to the known-working CUDA 12 stack:
+   ```
+   torch==2.8.0
+   torchaudio==2.8.0
+   faster-whisper==1.2.0
+   ctranslate2==4.6.0
+   ```
+
+4. **`requests` no longer transitive in faster-whisper 1.2.** The Dockerfile's pre-download step (`python -c "from faster_whisper import WhisperModel; WhisperModel('small', ...)"`) imports `requests` indirectly. faster-whisper 1.2 dropped it as a dep. Added `requests>=2.31.0` to `requirements.txt`.
+
 ## Out of scope
 
 - Removing other historical references to `whisper_logs` / `piper_logs` in unrelated files (handled in the broader cleanup pass).

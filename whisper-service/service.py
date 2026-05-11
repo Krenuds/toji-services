@@ -3,6 +3,7 @@ Standalone Whisper Service with GPU Acceleration
 Production-ready FastAPI service for speech recognition
 """
 
+import logging
 import os
 import tempfile
 from typing import Optional, Literal, Dict, Any, List
@@ -19,11 +20,16 @@ from logger import get_logger
 # Load environment variables
 load_dotenv()
 
-# Ensure logs directory exists
-os.makedirs("logs", exist_ok=True)
-
 # Initialize logger
 logger = get_logger('whisper-service')
+
+
+class _HealthFilter(logging.Filter):
+    def filter(self, record):
+        return "/health" not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_HealthFilter())
 
 
 class WhisperService:

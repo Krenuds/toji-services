@@ -1,13 +1,10 @@
-version: '3.8'
-
 services:
   whisper-service:
     build: .
     image: whisper-service:latest
     container_name: whisper-service
     restart: unless-stopped
-    
-    # GPU access for NVIDIA GPUs
+
     deploy:
       resources:
         reservations:
@@ -15,64 +12,38 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    
+
     ports:
       - "9000:9000"
-    
+
     environment:
-      # Service configuration
       - WHISPER_PORT=9000
       - WHISPER_HOST=0.0.0.0
       - WHISPER_MODEL_SIZE=small
-      
-      # GPU configuration
       - CUDA_VISIBLE_DEVICES=0
       - TORCH_CUDNN_V8_API_DISABLED=1
       - TOKENIZERS_PARALLELISM=false
-      
-      # Logging
       - LOG_LEVEL=INFO
+      - WHISPER_LOG_FILE=/app/logs/whisper-service.log
       - PYTHONUNBUFFERED=1
-    
+
     volumes:
-      # Model cache persistence
-      - whisper_models:/root/.cache/huggingface
-      - whisper_logs:/app/logs
-      
-      # Temporary files (tmpfs for better performance)
+      - /home/travis/services/data/whisper/models:/root/.cache/huggingface
+      - ../logs:/app/logs
       - type: tmpfs
         target: /app/tmp
         tmpfs:
           size: 1G
-    
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    
-    # Resource limits
-    mem_limit: 8g
-    memswap_limit: 8g
-    
-    # Security
-    user: "1001:1001"
-    read_only: true
-    cap_drop:
-      - ALL
-    cap_add:
-      - DAC_OVERRIDE  # For model file access
-    
-    # Logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
 
-volumes:
-  whisper_models:
-    driver: local
-  whisper_logs:
-    driver: local
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
