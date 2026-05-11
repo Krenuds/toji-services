@@ -72,6 +72,7 @@ nginx/ssl/*.crt
 # Claude artifacts
 dashboard.yaml
 .nelson/
+widgets/
 
 # Secrets
 secrets/
