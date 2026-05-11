@@ -70,7 +70,6 @@ nginx/ssl/*.crt
 !nginx/ssl/*.example
 
 # Claude artifacts
-CLAUDE.md
 dashboard.yaml
 .nelson/
 
