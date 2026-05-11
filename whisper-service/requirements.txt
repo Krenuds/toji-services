@@ -5,12 +5,19 @@ pydantic>=2.5.0
 python-multipart>=0.0.6
 
 # Speech processing - Whisper with GPU acceleration
-torch>=2.1.0
-torchaudio>=2.1.0
-faster-whisper>=1.0.0
+# Pinned to CUDA 12 stack — torch 2.11+ switched to CUDA 13 deps which
+# ctranslate2 (faster-whisper backend) cannot link against.
+torch==2.8.0
+torchaudio==2.8.0
+faster-whisper==1.2.0
+ctranslate2==4.6.0
 
 # Environment and configuration
 python-dotenv>=1.0.0
+
+# HTTP client (faster-whisper 1.2 dropped this as a transitive dep,
+# but the image-build pre-download step still needs it)
+requests>=2.31.0
 
 # Utilities
 typing-extensions>=4.8.0
