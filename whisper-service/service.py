@@ -6,6 +6,7 @@ Production-ready FastAPI service for speech recognition
 import logging
 import os
 import tempfile
+from contextlib import asynccontextmanager
 from typing import Optional, Literal, Dict, Any, List
 import torch
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
@@ -273,18 +274,23 @@ class WhisperService:
 
 # Initialize service and FastAPI app
 whisper_service = WhisperService()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan handler — runs shutdown logic after yield."""
+    yield
+    # Cleanup CUDA memory on service shutdown
+    logger.info("Shutting down Whisper service, cleaning up CUDA memory...")
+    whisper_service.cleanup_cuda_memory()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Whisper ASR Service",
     description="High-performance speech recognition service with GPU acceleration",
     version="2.0.0",
 )
-
-
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    """Cleanup CUDA memory on service shutdown"""
-    logger.info("Shutting down Whisper service, cleaning up CUDA memory...")
-    whisper_service.cleanup_cuda_memory()
 
 
 @app.post("/asr")
