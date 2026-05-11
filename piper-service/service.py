@@ -10,11 +10,12 @@ import io
 import os
 import logging
 from pathlib import Path
-import subprocess
 from typing import Optional, Dict, List, Any, Literal
 import urllib.request
 import wave
 import json
+
+import av
 
 from fastapi import FastAPI, HTTPException, Response, BackgroundTasks
 from fastapi.responses import StreamingResponse
@@ -150,23 +151,26 @@ async def load_voice_model(voice_name: str) -> piper.PiperVoice:
 
 
 def wav_to_opus(wav_bytes: bytes) -> bytes:
-    try:
-        proc = subprocess.run(
-            [
-                "ffmpeg", "-loglevel", "error",
-                "-i", "pipe:0",
-                "-ar", "48000", "-ac", "2",
-                "-c:a", "libopus", "-b:a", "64k", "-application", "voip",
-                "-f", "ogg", "pipe:1",
-            ],
-            input=wav_bytes,
-            capture_output=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError as e:
-        logger.error("ffmpeg opus encode failed: %s", e.stderr.decode(errors="replace"))
-        raise
-    return proc.stdout
+    in_buf = io.BytesIO(wav_bytes)
+    out_buf = io.BytesIO()
+    with av.open(in_buf, "r") as inp:
+        with av.open(out_buf, "w", format="ogg") as out:
+            in_stream = inp.streams.audio[0]
+            out_stream = out.add_stream("libopus", rate=48000, layout="stereo", options={"application": "voip"})
+            out_stream.bit_rate = 64000
+            resampler = av.AudioResampler(format="s16", layout="stereo", rate=48000)
+            for frame in inp.decode(in_stream):
+                for resampled in resampler.resample(frame):
+                    resampled.pts = None
+                    for packet in out_stream.encode(resampled):
+                        out.mux(packet)
+            for resampled in resampler.resample(None):
+                resampled.pts = None
+                for packet in out_stream.encode(resampled):
+                    out.mux(packet)
+            for packet in out_stream.encode(None):
+                out.mux(packet)
+    return out_buf.getvalue()
 
 
 def synthesize_audio_sync(text: str, voice_model: piper.PiperVoice) -> bytes:
