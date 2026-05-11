@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 import av
 
 from fastapi import FastAPI, HTTPException, Response, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 import piper
@@ -105,6 +106,14 @@ app = FastAPI(
     description="HTTP API for Piper text-to-speech synthesis",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_origin_regex=".*",
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

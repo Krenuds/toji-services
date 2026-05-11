@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from typing import Optional, Literal, Dict, Any, List
 import torch
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from faster_whisper import WhisperModel
 import uvicorn
 from dotenv import load_dotenv
@@ -290,6 +291,14 @@ app = FastAPI(
     title="Whisper ASR Service",
     description="High-performance speech recognition service with GPU acceleration",
     version="2.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_origin_regex=".*",
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
