@@ -1,6 +1,6 @@
-# toji-services-src
+# earpiece
 
-Two Docker microservices that back the Toji Discord bot's voice pipeline. The bot itself lives **outside this repo** at `~/toji` (active) and `/opt/Toji3` (in development).
+Two Docker microservices for voice I/O — text-to-speech and speech-to-text — exposed as plain HTTP APIs. Independent resource; not tied to any specific consumer.
 
 ## Services
 

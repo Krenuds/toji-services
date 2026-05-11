@@ -1,6 +1,6 @@
 # whisper-service
 
-`faster-whisper` wrapped in FastAPI. Audio in, transcript out. GPU-accelerated with CPU fallback. API-compatible with the public `whisper-asr-webservice` at `:9000/asr`. Consumed by the Toji Discord bot (outside this repo).
+`faster-whisper` wrapped in FastAPI. Audio in, transcript out. GPU-accelerated with CPU fallback. API-compatible with the public `whisper-asr-webservice` at `:9000/asr`.
 
 ## Container
 

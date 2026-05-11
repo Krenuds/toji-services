@@ -1,6 +1,6 @@
 # piper-service
 
-Piper-TTS wrapped in FastAPI. Text in, audio out. CPU-only. Consumed by the Toji Discord bot (outside this repo).
+Piper-TTS wrapped in FastAPI. Text in, audio out. CPU-only.
 
 ## Container
 
