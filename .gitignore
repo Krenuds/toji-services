@@ -71,6 +71,7 @@ nginx/ssl/*.crt
 
 # Claude artifacts
 CLAUDE.md
+dashboard.yaml
 
 # Secrets
 secrets/
